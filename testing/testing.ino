@@ -84,7 +84,10 @@ volatile byte state = LOW;
 
 const int speed = 255; //Setting speed to maximum
 unsigned long lastScanTime = 0;
-int distanceForward, distanceLeft, distanceRight, duration;
+int distanceForward = 0;
+int distanceLeft = 0; 
+int distanceRight = 0;
+int duration = 0;
 
 ////=====[Ultrasonic Distance Sensor]=====////
 
@@ -123,17 +126,13 @@ void setup()
   Serial.begin(9600);
 }
 
+/********
+* LOOP *
+********/
 
 void loop()
 {
-//line sensor  
-  qtr.read(sensorValues);
-
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(sensorValues[i]);
-    Serial.print('\t');
-  }
+  adjustPosition();
 
   justLookForward();
 
@@ -141,26 +140,22 @@ void loop()
   static unsigned long current_time = millis();
   static unsigned long lastCheckTime = 0;
 
-  if (millis() - lastScanTime >= 2000) { // if it's been 2 seconds since the last scan
+//  if(millis() >= current_time + 300){
+//        time_now += 100;
+//        Serial.println("Hello");
+//  }
+
+  if (millis() - lastScanTime >= 1500) { // if it's been 2 seconds since the last scan
     halt(); // stop the car
     lastScanTime = millis(); // record the time of the scan
     scanDistances(); // scan for distances and update global variables
   }
 
+
 //  if path right, turn right
 //  if path forward, go forward
 //  else go left.
-  
-   if (distanceLeft > 30) { // if there is no obstacle on the right
-   turnLeft();
-   } 
-      
-   if (distanceForward > 30) { // if there is no obstacle in front
-   moveForward();
-   } 
-   else { // if there is no obstacle on the left
-   turnRight();
-   } 
+// solveTheThing();
 
   Serial.println(counter1);
 }
@@ -200,7 +195,7 @@ void servo(int pin, int length) {
         digitalWrite(pin, HIGH);
         delayMicroseconds(length);//in microseconds
         digitalWrite(pin, LOW);
-        delay(20); 
+//        delay(20); 
 }
 }
 
@@ -221,7 +216,7 @@ int lookRight() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
   distanceRight = duration / 58.2;
-  delay(300);
+//  delay(300);
   Serial.print("The distance to the Right is: ");
   Serial.println(distanceRight);
 }
@@ -254,6 +249,7 @@ int lookLeft() {
   int duration = pulseIn(echoPin, HIGH);
   distanceForward = duration / 58.2; // convert duration to distance in cm
   delay(300);
+
   Serial.print("The distance Forward is: ");
   Serial.println(distanceForward);
 }
@@ -312,57 +308,155 @@ void halt() {
 
 ////=====[Movement Interrupts]=====////
 
-void stop() {
+void stopped() {
   analogWrite(a1, 0); //lower speed to drive straight
   analogWrite(a2, 0);
   analogWrite(b1, 0);
   analogWrite(b2, 0); 
   strip.fill(red);
   strip.show(); 
+  counter1 = 0;
+  counter2 = 0;
 }
 
-void moveForward(){
-  if (counter1 <= 45 && counter2 <= 45){
+void moveForward(int pulse1, int pulse2){
+  if (counter1 <= pulse1 && counter2 <= pulse2){
     analogWrite(a1, 0); //lower speed to drive straight
-    analogWrite(a2, 245);
-    analogWrite(b1, 255);
+    analogWrite(a2, 200);
+    analogWrite(b1, 200);
     analogWrite(b2, 0);
      
     strip.fill(white);
     strip.show();  
   }
   else{
-    stop();
-    counterReset();
+    stopped();
   }
 }
 
-void turnRight() {
-  if (counter1 <= 14 && counter2 <= 14){
+void goBackward(int pulse1, int pulse2){
+  if (counter1 <= pulse1 && counter2 <= pulse2){
+    analogWrite(a1, 200); //lower speed to drive straight
+    analogWrite(a2, 0);
+    analogWrite(b1, 0);
+    analogWrite(b2, 200);
+     
+    strip.fill(white);
+    strip.show();  
+  }
+  else{
+    stopped();
+  }
+}
+
+void turnRight(int pulse1, int pulse2){
+  if (counter1 <= pulse1 && counter2 <= pulse2){ // L && R
   analogWrite(a1, 0);
-  analogWrite(a2, 255);
+  analogWrite(a2, 200);
   analogWrite(b1, 0);
-  analogWrite(b2, 255); 
-  strip.fill(amber);
-  strip.show(); 
+  analogWrite(b2, 255);
   }
   else{
-    stop();
-    counterReset();
+    stopped();
   }
 }
 
-void turnLeft() {
-  if (counter1 <= 14 && counter2 <= 14){
-  analogWrite(a1, 255); //lower speed to drive straight
-  analogWrite(a2, 0);
-  analogWrite(b1, 255);
-  analogWrite(b2, 0);
-  strip.fill(amber);
-  strip.show();
+void turnLeft(int pulse1, int pulse2){
+  if (counter1 <= pulse1 && counter2 <= pulse2){
+    analogWrite(a1, 245); //left
+    analogWrite(a2, 0); //left
+    analogWrite(b1, 200); //right
+    analogWrite(b2, 0); //right
   }
   else{
-    stop();
-    counterReset();
+    stopped();
   }
+}
+
+//key distances: 14 on either side, 8 in front
+
+//maze solving logic
+void solveTheThing() {
+   if (distanceLeft > 30) { // if there is no obstacle on the right
+   turnLeft(15, 15);
+   }  
+   if (distanceForward > 30) { // if there is no obstacle in front
+   moveForward(45, 45);
+   } 
+   else { // if there is no obstacle on the left
+   turnRight(15, 15);
+   } 
+}
+
+//self-centering logic:
+void adjustPosition() {
+//  scanDistances();
+          //biggest adjustment, stuck on the wall:
+            if (distanceLeft <= 5 || distanceForward <= 5) {
+              goBackward (7, 7);
+            }
+           
+          //bigger adjustment, too close to a wall, will collide with wall on the next movement, ~45 degrees
+            else if (distanceLeft == 7) {
+              turnRight(6, 6);
+            }
+              else if (distanceLeft > 8){
+                turnLeft(6, 6);
+              }
+              else if (distanceForward < 6){
+                goBackward(6, 6);
+              } 
+          //big adjustment, still too close, might collide with wall in one to two movements ~34 degrees
+            else if (distanceLeft == 8) {
+              turnRight(5, 5);
+            }
+              else if (distanceLeft > 9){
+                turnLeft(5, 5);
+              }
+              else if (distanceForward < 6){
+                goBackward(5, 5);
+              }
+          //medium adjustment ~30 degrees
+            else if (distanceLeft == 9) { 
+              turnRight(4, 4);
+            }
+              else if (distanceLeft > 10){
+                turnLeft(4, 4);
+              }
+              else if (distanceForward < 6){
+                goBackward(4, 4);
+              }
+          //small adjustment, ~23 degrees 
+            else if (distanceLeft == 10) { 
+              turnRight(3, 3);
+            }
+              else if (distanceLeft > 11){
+                turnLeft(3, 3);
+              }
+              else if (distanceForward == 7){
+                goBackward(3, 3);
+              }
+          //smaller adjustment, mostly center, in need of slight adjustment, ~19 degree turns
+            else if (distanceLeft == 11) {
+              turnLeft(2, 2);
+            }
+              else if (distanceLeft > 12){
+                turnLeft(2, 2);
+              }
+              else if (distanceForward == 7){
+                goBackward(2, 2);
+              }
+          //smallest adjustment, nearly perfectly centered/a microadjustment ~13 degrees turns
+            else if (distanceLeft == 12 ) {
+              turnRight(1, 1);
+            }
+              else if (distanceLeft > 14){
+                turnLeft(1, 1);
+              }
+              else if (distanceForward == 7){
+                goBackward(1, 1);
+              }
+            else{
+              moveForward(15, 15);
+            }
 }
