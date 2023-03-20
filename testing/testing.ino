@@ -3,8 +3,10 @@
 ****************************/
 ////=====[Digital Pins]=====////
   
-  // 0 -> HR
-  // 1 -> HT
+  // 0 RX -> HR
+  
+  // 1 TX -> HT
+  
   // 2 -> R1
   const byte interruptPin1 = 2; // R1, Left rotation sensor
   // 3 -> R2
@@ -84,12 +86,13 @@ volatile byte state = LOW;
 
 const int speed = 255; //Setting speed to maximum
 unsigned long lastScanTime = 0;
+
+////=====[Ultrasonic Distance Sensor]=====////
+
 int distanceForward = 0;
 int distanceLeft = 0; 
 int distanceRight = 0;
 int duration = 0;
-
-////=====[Ultrasonic Distance Sensor]=====////
 
 void setup()
 {
@@ -132,12 +135,11 @@ void setup()
 
 void loop()
 {
-  adjustPosition();
-
   justLookForward();
 
   static unsigned long start_time = millis();
   static unsigned long current_time = millis();
+  static unsigned long interval = 100;
   static unsigned long lastCheckTime = 0;
 
 //  if(millis() >= current_time + 300){
@@ -150,14 +152,25 @@ void loop()
     lastScanTime = millis(); // record the time of the scan
     scanDistances(); // scan for distances and update global variables
   }
-
+  
+//  adjustPosition();
+//
+//  if (millis() - lastScanTime >= 1500) { // if it's been 2 seconds since the last scan
+//    halt(); // stop the car
+//    lastScanTime = millis(); // record the time of the scan
+//    scanDistances(); // scan for distances and update global variables
+//  }
 
 //  if path right, turn right
 //  if path forward, go forward
 //  else go left.
-// solveTheThing();
+// 
 
-  Serial.println(counter1);
+solveTheThing();
+
+
+ Serial.println(counter1);
+
 }
 
 /****************************
@@ -190,13 +203,14 @@ uint32_t red = strip.Color(255, 0, 0);
 uint32_t amber = strip.Color(255, 75, 0);
 
 ////=====[Servos]=====////
+
 void servo(int pin, int length) {
-      for (int i=0; i < servoPulseRepeat; i++) {
-        digitalWrite(pin, HIGH);
-        delayMicroseconds(length);//in microseconds
-        digitalWrite(pin, LOW);
-//        delay(20); 
-}
+    for (int i=0; i < servoPulseRepeat; i++) {
+      digitalWrite(pin, HIGH);
+      delayMicroseconds(length);//in microseconds
+      digitalWrite(pin, LOW);
+        delay(20); 
+    }
 }
 
 ////=====[Distance Checking]=====////
@@ -217,8 +231,8 @@ int lookRight() {
   duration = pulseIn(echoPin, HIGH);
   distanceRight = duration / 58.2;
 //  delay(300);
-  Serial.print("The distance to the Right is: ");
-  Serial.println(distanceRight);
+//  Serial.print("The distance to the Right is: ");
+//  Serial.println(distanceRight);
 }
 
 int lookLeft() {
@@ -230,7 +244,7 @@ int lookLeft() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
   distanceLeft = duration / 58.2;
-  delay(300);
+//  delay(300);
   Serial.print("The distance to the Left is: ");
   Serial.println(distanceLeft);
 }
@@ -248,7 +262,7 @@ int lookLeft() {
   digitalWrite(trigPin, LOW);
   int duration = pulseIn(echoPin, HIGH);
   distanceForward = duration / 58.2; // convert duration to distance in cm
-  delay(300);
+//  delay(300);
 
   Serial.print("The distance Forward is: ");
   Serial.println(distanceForward);
@@ -323,7 +337,7 @@ void moveForward(int pulse1, int pulse2){
   if (counter1 <= pulse1 && counter2 <= pulse2){
     analogWrite(a1, 0); //lower speed to drive straight
     analogWrite(a2, 200);
-    analogWrite(b1, 200);
+    analogWrite(b1, 215);
     analogWrite(b2, 0);
      
     strip.fill(white);
@@ -339,7 +353,7 @@ void goBackward(int pulse1, int pulse2){
     analogWrite(a1, 200); //lower speed to drive straight
     analogWrite(a2, 0);
     analogWrite(b1, 0);
-    analogWrite(b2, 200);
+    analogWrite(b2, 215);
      
     strip.fill(white);
     strip.show();  
@@ -354,7 +368,10 @@ void turnRight(int pulse1, int pulse2){
   analogWrite(a1, 0);
   analogWrite(a2, 200);
   analogWrite(b1, 0);
-  analogWrite(b2, 255);
+  analogWrite(b2, 215);
+
+    strip.fill(amber);
+  strip.show(); 
   }
   else{
     stopped();
@@ -363,10 +380,13 @@ void turnRight(int pulse1, int pulse2){
 
 void turnLeft(int pulse1, int pulse2){
   if (counter1 <= pulse1 && counter2 <= pulse2){
-    analogWrite(a1, 245); //left
+    analogWrite(a1, 200); //left
     analogWrite(a2, 0); //left
-    analogWrite(b1, 200); //right
+    analogWrite(b1, 215); //right
     analogWrite(b2, 0); //right
+
+      strip.fill(amber);
+  strip.show(); 
   }
   else{
     stopped();
@@ -377,60 +397,61 @@ void turnLeft(int pulse1, int pulse2){
 
 //maze solving logic
 void solveTheThing() {
-   if (distanceLeft > 30) { // if there is no obstacle on the right
-   turnLeft(15, 15);
+   if (distanceLeft > 15) { // if there is no obstacle on the left
+   turnLeft(15, 15); 
    }  
-   if (distanceForward > 30) { // if there is no obstacle in front
-   moveForward(45, 45);
-   } 
-   else { // if there is no obstacle on the left
-   turnRight(15, 15);
-   } 
+   else{
+     if (distanceForward > 15) { // if there is no obstacle in front
+     moveForward(45, 45);
+     } 
+     else { // if there is no obstacle on the left
+     turnRight(15, 15);
+     } 
+   }
 }
 
+// distanceLeft/14
+//
+//distanceForward/8
+
 //self-centering logic:
-void adjustPosition() {
-//  scanDistances();
-          //biggest adjustment, stuck on the wall:
-            if (distanceLeft <= 5 || distanceForward <= 5) {
+void adjustPosition() {         
+            if (distanceLeft <= 6 || distanceForward <= 5) { //biggest adjustment, stuck on the wall
               goBackward (7, 7);
             }
-           
-          //bigger adjustment, too close to a wall, will collide with wall on the next movement, ~45 degrees
-            else if (distanceLeft == 7) {
+            else if (distanceLeft == 7) { //bigger adjustment, too close to a wall, will collide with wall on the next movement, ~45 degrees
               turnRight(6, 6);
             }
-              else if (distanceLeft > 8){
+              else if (distanceLeft == 21){
                 turnLeft(6, 6);
               }
-              else if (distanceForward < 6){
-                goBackward(6, 6);
-              } 
-          //big adjustment, still too close, might collide with wall in one to two movements ~34 degrees
-            else if (distanceLeft == 8) {
+                else if (distanceForward == 6){
+                  goBackward(6, 6);
+                } 
+            else if (distanceLeft == 8) { //big adjustment, still too close, might collide with wall in one to two movements ~34 degrees
               turnRight(5, 5);
             }
-              else if (distanceLeft > 9){
+              else if (distanceLeft == 20){
                 turnLeft(5, 5);
               }
-              else if (distanceForward < 6){
-                goBackward(5, 5);
-              }
+                else if (distanceForward == 6){
+                  goBackward(5, 5);
+                }
           //medium adjustment ~30 degrees
             else if (distanceLeft == 9) { 
               turnRight(4, 4);
             }
-              else if (distanceLeft > 10){
+              else if (distanceLeft == 19){
                 turnLeft(4, 4);
               }
-              else if (distanceForward < 6){
+              else if (distanceForward == 6){
                 goBackward(4, 4);
               }
           //small adjustment, ~23 degrees 
             else if (distanceLeft == 10) { 
               turnRight(3, 3);
             }
-              else if (distanceLeft > 11){
+              else if (distanceLeft == 18){
                 turnLeft(3, 3);
               }
               else if (distanceForward == 7){
@@ -440,7 +461,7 @@ void adjustPosition() {
             else if (distanceLeft == 11) {
               turnLeft(2, 2);
             }
-              else if (distanceLeft > 12){
+              else if (distanceLeft == 17){
                 turnLeft(2, 2);
               }
               else if (distanceForward == 7){
@@ -450,13 +471,20 @@ void adjustPosition() {
             else if (distanceLeft == 12 ) {
               turnRight(1, 1);
             }
-              else if (distanceLeft > 14){
+              else if (distanceLeft == 13){
                 turnLeft(1, 1);
               }
               else if (distanceForward == 7){
                 goBackward(1, 1);
               }
-            else{
-              moveForward(15, 15);
-            }
+         else if (distanceLeft > 30) { // if there is no obstacle on the left
+          turnLeft(15, 15);
+          moveForward(30, 30);
+          }  
+         else if (distanceForward > 30) { // if there is no obstacle in front
+         moveForward(45, 45);
+         } 
+         else { // if there is no obstacle on the left
+         turnRight(15, 15);
+         } 
 }
