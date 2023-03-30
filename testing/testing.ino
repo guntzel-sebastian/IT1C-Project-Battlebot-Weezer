@@ -4,10 +4,8 @@
   
   ////=====[Digital Pins]=====////
     
-    // 0 RX -> HR
-    
-    // 1 TX -> HT
-    
+    // 0
+    // 1 TX -> HR  
     // 2 -> R1
     const byte interruptPin1 = 2; // R1, Left rotation sensor
     // 3 -> R2
@@ -73,6 +71,10 @@
   int setPulse2 = 0;
   boolean turningLeft = false;
   boolean forward = false;
+  boolean isRotating = false;
+  volatile int previousCount = 0;
+
+
   
   ////=====[Servo]=====////
   
@@ -83,6 +85,9 @@
   
   
   ////=====[Gripper]=====////
+
+  int gripperClosed = 0;
+  int gripperOpen = 0;
   
   #define gripper_open_pulse 1600
   #define gripper_close_pulse  971 // 
@@ -90,15 +95,21 @@
   
   ////=====[Wheel Motors]=====////
   
-  const int speed = 255; //Setting speed to maximum
+  const int wheelSpeed = 190; //Setting speed to maximum
   unsigned long lastScanTime = 0;
+  int distanceForward = 100;
+  int distanceLeft = 0; 
+  int distanceRight = 0;
+  int duration = 0;
+  int threshold = 800;
+
+  // Define the desired distance from the walls
+  const float DESIRED_DISTANCE = 10.0;
+  
+  // Define the speed and direction of the robot
+  int wheelDirection = 1;
   
   ////=====[Ultrasonic Distance Sensor]=====////
-  
-  double distanceForward = 0;
-  double distanceLeft = 0; 
-  double distanceRight = 0;
-  int duration = 0;
   
   void setup()
   {
@@ -106,6 +117,31 @@
     qtr.setTypeAnalog();
     qtr.setSensorPins((const uint8_t[]){A7, A6, A5, A4, A3, A2, A1, A0}, SensorCount);
   
+    // Calibration
+    if(gripperClosed==0) {
+      moveForward(40, 40);
+    }
+      openGripper();
+      for(uint16_t i = 0; i < 27; i++){
+        qtr.calibrate();
+      }
+    
+     //print the calibration minimum values measured when emitters were on
+      Serial.begin(9600);
+      for(uint8_t i = 0; i < SensorCount; i++){
+        Serial.print(qtr.calibrationOn.minimum[i]);
+        Serial.print(' ');
+      }
+      Serial.println();
+    
+      //print the calibration maximum values measured when emitters were on
+      for(uint8_t i = 0; i < SensorCount; i++){
+        Serial.print(qtr.calibrationOn.maximum[i]);
+        Serial.print(' ');
+      }
+      Serial.println();
+      Serial.println();
+    
     //interrupts
     pinMode(interruptPin1, INPUT_PULLUP);
     pinMode(interruptPin2, INPUT_PULLUP);
@@ -141,42 +177,66 @@
   
   void loop()
   {
+
+//// read calibrated sensor values and obtain a measure of the line position from 0 to 5000
+//  uint16_t position = qtr.readLineBlack(sensorValues);
+//
+//  /* print the sensor values as numbers from 0 to 1000, where 0 means maximum
+//   reflectance and 1000 means minimum reflectance */
+//  
+//  //The the data most on the right is the left sensor, and vice versa
+//  for (uint8_t i = 0; i < SensorCount; i++){
+//    Serial.print(sensorValues[i]);
+//    Serial.print('\t');
+//  }
+//
+//  Serial.print(position);
+//
+//// if the black line is spotted.
+//if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && sensorValues[6] > threshold && sensorValues[7] > threshold && gripperClosed == 0){
+//  halt();
+//  //close gripper
+//  //gripperClose
+//  closeGripper();
+//  gripperClosed = 1;
+//  turnLeft(17, 17);
+//  delay(1100);
+//  moveForward(50,50);
+//  delay(500);
+//
+//} else if( sensorValues[3] > threshold && sensorValues[4] > threshold ){ 
+//      moveForward(20, 20);
+//  }
+//  else if(sensorValues[0] > threshold || sensorValues[1] > threshold || sensorValues[2] > threshold){ // line is on the right
+//      turnRight(15, 15);
+//  }
+//  else if(sensorValues[5] > threshold || sensorValues[6] > threshold || sensorValues[7] > threshold){ // line is on the left
+//      turnLeft(15, 15);
+//  } else if(sensorValues[3] < threshold && sensorValues[4] < threshold && gripperClosed == 1){
+
+    
     justLookForward();
+//    lookForward();
   
     static unsigned long start_time = millis();
     static unsigned long current_time = millis();
-    static unsigned long interval = 100;
+    static unsigned long interval = 0;
     static unsigned long lastCheckTime = 0;
   
-  //  if(millis() >= current_time + 300){
-  //        time_now += 100;
-  //        Serial.println("Hello");
-  //  }
-  
-//    if (millis() - lastScanTime >= 3000) { // if it's been 2 seconds since the last scan
-//      halt(); // stop the car
-//      lastScanTime = millis(); // record the time of the scan
-//      scanDistances(); // scan for distances and update global variables
+
+    solveIt();
+    isStuck();
 //    }
-    
-  //  adjustPosition();
+  Serial.print("Previous Count: ");
+  Serial.println(previousCount);
 
-
- 
-  
-  //  if path right, turn right
-  //  if path forward, go forward
-  //  else go left.
-  // 
-  
-solveIt();
-//  delay(1000);
-
-Serial.print("Counter 1: ");
-Serial.println(counter1);
-Serial.print("Counter 2: ");  
-Serial.println(counter2);
+//Serial.print("Counter 1: ");
+//Serial.println(counter1);
+//Serial.print("Counter 2: ");  
+//Serial.println(counter2);
   }
+
+  
   
   /****************************
   *      [ Functions ]        *
@@ -196,11 +256,32 @@ Serial.println(counter2);
     interrupts();
   }
   
-  void counterReset(){
-    counter1 = 0;
-    counter2 = 0;
-  }
-  
+//  void counterReset(){
+//    counter1 = 0;
+//    counter2 = 0;
+//  }
+//      void waitUntilPulseCountLeft(unsigned long count){
+//      int previousPulseStateLeft = digitalRead(interruptPin1);
+//      unsigned long lastPulseTime  = millis();
+//
+//      while(forward == true){
+//        int pulseStateLeft = digitalRead(interruptPin1);
+//
+//          if (pulseStateLeft != previousPulseStateLeft){
+//            previousPulseStateLeft = pulseStateLeft;
+//            lastPulseTime = millis();
+//            pulseCountLeft++;
+//            if (pulseCountLeft >= count){
+//              pulseCountLeft = 0;
+//              return;
+//            }
+//          }
+//
+//          if (millis() - lastPulseTime >= 1000) {
+//            moveBackward(10, 10);
+//          }
+//      }
+//    }
   ////=====[NeoPixels]=====////
   
   uint32_t white = strip.Color(255, 255, 255);
@@ -218,13 +299,23 @@ Serial.println(counter2);
           delay(20); 
       }
   }
+
+  ////=====[Gripper]=====////
+
+  void openGripper() {
+    servo(gripperPin, gripper_open_pulse);
+  }
+  
+  void closeGripper(){
+    servo(gripperPin, gripper_close_pulse);
+  }
   
   ////=====[Distance Checking]=====////
   
   void scanDistances() {
     lookForward();
     lookLeft(); // scan left
-  //  lookRight(); // scan right
+//    lookRight(); // scan right
     justLookForward(); // return to forward-facing position
   }
   
@@ -236,9 +327,8 @@ Serial.println(counter2);
     digitalWrite(trigPin, LOW);
     duration = pulseIn(echoPin, HIGH);
     distanceRight = duration / 58.2;
-  //  delay(300);
-  //  Serial.print("The distance to the Right is: ");
-  //  Serial.println(distanceRight);
+//    Serial.print("The distance to the Right is: ");
+//    Serial.println(distanceRight);
   }
   
   double lookLeft() {
@@ -250,9 +340,8 @@ Serial.println(counter2);
     digitalWrite(trigPin, LOW);
     duration = pulseIn(echoPin, HIGH);
     distanceLeft = duration / 58.2;
-    delay(300);
-    Serial.print("The distance to the Left is: ");
-    Serial.println(distanceLeft);
+//    Serial.print("The distance to the Left is: ");
+//    Serial.println(distanceLeft);
   }
   
    int justLookForward() {
@@ -267,14 +356,29 @@ Serial.println(counter2);
     delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
     int duration = pulseIn(echoPin, HIGH);
-    distanceForward = duration / 58.2; // convert duration to distance in cm
-  //  delay(300);
-  
-    Serial.print("The distance Forward is: ");
-    Serial.println(distanceForward);
+    distanceForward = duration / 58.2; // convert duration to distance in cm  
+//    Serial.print("The distance Forward is: ");
+//    Serial.println(distanceForward);
   }
   
   ////=====[Movement Interrupts]=====////
+
+  void isStuck() {   
+    static unsigned long interval = 0;
+          
+    if(millis() - interval >= 1000){
+      if(previousCount != counter1 || previousCount == 0){
+        previousCount = counter1;
+      }
+      else if(previousCount == counter1){
+        moveBackRight(30, 30);
+        delay(300);
+        return;
+      }
+     interval = millis();
+    }
+  }
+  
   void halt() {
     //Set motor to stop the car
     analogWrite(a1, LOW);
@@ -301,9 +405,9 @@ Serial.println(counter2);
     setPulse1 = counter1 - pulse1;
     setPulse2 = counter2 - pulse2;
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){
-      analogWrite(a1, 0); //lower speed to drive straight
+      analogWrite(a1, 0); //left motors, lower speed to drive straight
       analogWrite(a2, 200);
-      analogWrite(b1, 215);
+      analogWrite(b1, 215); //right motors
       analogWrite(b2, 0);
       strip.fill(white);
       strip.show();  
@@ -312,17 +416,16 @@ Serial.println(counter2);
       stopped();
       turningLeft = false;
       forward = false;
-      delay(1000);
     }
   }
   
-  void goBackward(int pulse1, int pulse2){
+  void moveBackward(int pulse1, int pulse2){
     setPulse1 = counter1 - pulse1;
     setPulse2 = counter2 - pulse2;
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){
       analogWrite(a1, 200); //lower speed to drive straight
       analogWrite(a2, 0);
-      analogWrite(b1, 0);
+      analogWrite(b1, 0); //right motors
       analogWrite(b2, 215);
       strip.fill(white);
       strip.show(); 
@@ -338,14 +441,30 @@ Serial.println(counter2);
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){ // L && R
       analogWrite(a1, 0);
       analogWrite(a2, 200);
-      analogWrite(b1, 0);
-      analogWrite(b2, 215);
+      analogWrite(b1, 0); //right motors
+      analogWrite(b2, 230);
       strip.fill(amber);
+      strip.show(); 
+      delay(250);
+    }
+    else{
+      stopped();
+    }
+  }
+
+  void moveBackRight(int pulse1, int pulse2){
+    setPulse1 = counter1 - pulse1;
+    setPulse2 = counter2 - pulse2;
+    if (setPulse1 <= pulse1 && setPulse2 <= pulse2){ // L && R
+      analogWrite(a1, 170);
+      analogWrite(a2, 0);
+      analogWrite(b1, 0); //right motors
+      analogWrite(b2, 255);
+      strip.fill(white);
       strip.show(); 
     }
     else{
       stopped();
-
     }
   }
   
@@ -353,7 +472,7 @@ Serial.println(counter2);
     setPulse1 = counter1 - pulse1;
     setPulse2 = counter2 - pulse2;
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){
-      analogWrite(a1, 200); //left
+      analogWrite(a1, 215); //left
       analogWrite(a2, 0); //left
       analogWrite(b1, 215); //right
       analogWrite(b2, 0); //right
@@ -364,9 +483,10 @@ Serial.println(counter2);
     else{
       stopped();
       forward = true;
-      delay(1000);
     }
   }
+
+  
   
   //key distances: 14 on either side, 8 in front
   
@@ -377,35 +497,35 @@ Serial.println(counter2);
       halt();
       scanDistances();
     }
-    solveTheThing();
+    adjustPosition();
+    
   }
 
 
   
   void solveTheThing() {
 
-     if (distanceLeft > 15 && turningLeft == false) { // if there is no obstacle on the left    
+     if (distanceLeft > 20 && turningLeft == false) { // if there is no obstacle on the left    
         turningLeft = true;
-        delay(1000);
         Serial.print("Boolean: ");
         Serial.println(turningLeft);
      }
      else if(turningLeft == true){
         if (!forward){
-          turnLeft(9, 9);
+          turnLeft(7, 7);
         }
         if (forward) {   
-          moveForward(24, 24);
+          moveForward(30, 30);
         }
         Serial.print("Boolean: ");
         Serial.println(turningLeft);
      }
-     else if(distanceForward > 15) { // if there is no obstacle in front
+     else if(distanceForward > 20) { // if there is no obstacle in front
        forward = true;
-       moveForward(24, 24);
+       moveForward(30, 30);
      } 
      else { // if there is no obstacle on the left
-      turnRight(9, 9);
+      turnRight(13, 7);
      } 
 
   }
@@ -414,7 +534,7 @@ Serial.println(counter2);
   //self-centering logic:
   void adjustPosition() {         
               if (distanceLeft != 0.00 && distanceLeft <= 6.00 || distanceForward != 0.00 && distanceForward <= 5.00) { //biggest adjustment, stuck on the wall
-                goBackward (15, 15);
+                moveBackward (15, 15);
               }
               else if (distanceLeft > 6.00 && distanceLeft <= 7.00) { //bigger adjustment, too close to a wall, will collide with wall on the next movement, ~45 degrees
                 turnRight(6, 6);
@@ -435,20 +555,16 @@ Serial.println(counter2);
                 turnRight(1, 1);
               }
               else { // if there is no obstacle on the left
-                 if (distanceLeft > 15) { // if there is no obstacle on the left
-                    Serial.println(counter1, counter2);
-                 turnLeft(15, 15);
-                    Serial.println(counter1, counter2);
-                 moveForward(45, 45); 
-                    Serial.println(counter1, counter2);
-                 }  
-                 else{
-                   if (distanceForward > 15) { // if there is no obstacle in front
-                   moveForward(45, 45);
-                   } 
-                   else { // if there is no obstacle on the left
-                   turnRight(15, 15);
-                   } 
-                 }
+                 solveTheThing();
               } 
   }
+
+  void goForward(){
+    analogWrite(a1, 0); //lower speed to drive straight
+    analogWrite(a2, 200);
+    analogWrite(b1, 215);
+    analogWrite(b2, 0);
+     
+    strip.fill(white);
+    strip.show();  
+}
