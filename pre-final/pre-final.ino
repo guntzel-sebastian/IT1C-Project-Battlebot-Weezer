@@ -391,7 +391,7 @@ void moveForward(int pulse1,int pulse2){
     analogWrite(b2, 0);
     strip.fill(white);
     strip.show();
-
+    Serial.println();
   }
     halt();
 }
@@ -406,6 +406,7 @@ void turnLeft(int pulse1, int pulse2){
     analogWrite(b2, 0); //right
     strip.fill(amber);
     strip.show();
+    Serial.println();
   }
     halt();
 }
@@ -420,7 +421,7 @@ void turnLeft(int pulse1, int pulse2){
       analogWrite(b2, 230);
       strip.fill(amber);
       strip.show(); 
-      delay(250);
+      Serial.println();
     }
       halt();
   }
@@ -435,6 +436,7 @@ void turnLeft(int pulse1, int pulse2){
       analogWrite(b2, 215);
       strip.fill(white);
       strip.show(); 
+      Serial.println();
     }
       halt();
   }
@@ -448,7 +450,8 @@ void moveBackRight(int pulse1, int pulse2){
     analogWrite(b1, 0); //right motors
     analogWrite(b2, 255);
     strip.fill(white);
-    strip.show(); 
+    strip.show();
+     Serial.println();
   }
     halt();
 }
