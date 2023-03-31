@@ -7,28 +7,28 @@
   // 0 -> HR5
   // 1 -> HT
   // 2 -> R1
-  const byte interruptPin1 = 2; // R1, Left rotation sensor
+  const byte interruptPin1 = 0; // R1, Left rotation sensor
   // 3 -> R2
   const byte interruptPin2 = 3; // R2, Right rotation sensor, pwm pin
   // 4 -> N1
-  #define pixelPin 4 // N1 Digital IO pin connected to the NeoPixels
+  #define pixelPin 2 // N1 Digital IO pin connected to the NeoPixels
   // 5 -> b2
   #define b2 5 // right motor, pwm
-  // 6 -> b1
+  // 6 -> b1w
   #define b1 6 // right motor, pwm
   // 7 -> [unassigned]
   // 8 -> "Eyes" Servo
   #define servoPin 8
   // 9 -> Trig
   const int trigPinForward = 9; // ultrasonic trigger pin
-  const int trigPinLeft = A0;
+  const int trigPinLeft = 7;
   // 10 -> a1
   #define a1 10 // left motor, pwm
   // 11 -> a2
   #define a2 11 // left motor, pwm
   // 12 -> echo
   const int echoPinForward = 12; // ultrasonic echo pin 
-  const int echoPinLeft = A1;
+  const int echoPinLeft = 4;
   // 13 -> GR
   #define gripperPin 13
 
@@ -51,7 +51,7 @@
 ////=====[Infrared Line Sensor]=====////
 #include <QTRSensors.h>
 QTRSensors qtr;
-const uint8_t SensorCount = 6;
+const uint8_t SensorCount = 8;
 uint16_t sensorValues[SensorCount];
 
 ////=====[NeoPixels]=====////
@@ -73,6 +73,7 @@ int counter2 = 0;
 volatile byte state = LOW;
  int setPulse1 = 0;
   int setPulse2 = 0;
+  bool movingForward;
 
 ////=====[Servo]=====////
 
@@ -91,7 +92,7 @@ volatile byte state = LOW;
 
 const int wheelSpeed = 190; //Setting speed to maximum
 unsigned long lastScanTime = 0;
-int distanceForward;
+int distanceForward = 50;
 int distanceLeft; 
 int distanceRight = 0;
 int duration = 0;
@@ -106,13 +107,13 @@ void setup()
 {
   // infrared line sensor
   qtr.setTypeAnalog();
-  qtr.setSensorPins((const uint8_t[]){A7, A6, A5, A4, A3, A2}, SensorCount);
+  qtr.setSensorPins((const uint8_t[]){A7, A6, A5, A4, A3, A2, A1, A0}, SensorCount);
 
 // Calibration
-//if(gripperClosed==0) {
-//  goForward();
-//}
-//  openGripper();
+if(gripperClosed==0) {
+  moveForward(40,40);
+}
+  openGripper();
   for(uint16_t i = 0; i < 27; i++){
     qtr.calibrate();
   }
@@ -120,18 +121,18 @@ void setup()
  //print the calibration minimum values measured when emitters were on
   Serial.begin(9600);
   for(uint8_t i = 0; i < SensorCount; i++){
-//    Serial.print(qtr.calibrationOn.minimum[i]);
-//    Serial.print(' ');
+    Serial.print(qtr.calibrationOn.minimum[i]);
+    Serial.print(' ');
   }
   Serial.println();
 
   //print the calibration maximum values measured when emitters were on
   for(uint8_t i = 0; i < SensorCount; i++){
-//    Serial.print(qtr.calibrationOn.maximum[i]);
-//    Serial.print(' ');
+    Serial.print(qtr.calibrationOn.maximum[i]);
+    Serial.print(' ');
   }
-//  Serial.println();
-//  Serial.println();
+  Serial.println();
+  Serial.println();
 
   //interrupts
   pinMode(interruptPin1, INPUT_PULLUP);
@@ -164,56 +165,62 @@ void setup()
 
 
 void loop() {
-//  // read calibrated sensor values and obtain a measure of the line position from 0 to 5000
-//  uint16_t position = qtr.readLineBlack(sensorValues);
-//
-//  /* print the sensor values as numbers from 0 to 1000, where 0 means maximum
-//   reflectance and 1000 means minimum reflectance */
-//  
-//  //The the data most on the right is the left sensor, and vice versa
-//  for (uint8_t i = 0; i < SensorCount; i++){
-////    Serial.print(sensorValues[i]);
-////    Serial.print('\t');
-//  }
-//
-////  Serial.print(position);
-//
-//// if the black line is spotted.
-//if(sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && sensorValues[6] > threshold && gripperClosed == 0){
-//  halt();
-//  //close gripper
-//  //gripperClose
-//  closeGripper();
-//  gripperClosed = 1;
-//  turnLeft(7, 7);
-//  delay(1100);
-//  moveForward(50,50);
-//  delay(500);
-//
-//} else if( sensorValues[3] > threshold && sensorValues[4] > threshold ){ 
-//      moveForward(20, 20);
-//  }
-//  else if(sensorValues[1] > threshold || sensorValues[2] > threshold){ // line is on the right
-//      turnRight(7, 7);
-//  }
-//  else if(sensorValues[5] > threshold || sensorValues[6] > threshold){ // line is on the left
-//      turnLeft(7, 7);
-//  } else if(sensorValues[1] < threshold && sensorValues[2] < threshold && sensorValues[3] < threshold && sensorValues[4] < threshold && sensorValues[5] < threshold && sensorValues[6] < threshold && gripperClosed == 1){
-//    
+  // read calibrated sensor values and obtain a measure of the line position from 0 to 5000
+  uint16_t position = qtr.readLineBlack(sensorValues);
+
+  /* print the sensor values as numbers from 0 to 1000, where 0 means maximum
+   reflectance and 1000 means minimum reflectance */
+  
+  //The the data most on the right is the left sensor, and vice versa
+  for (uint8_t i = 0; i < SensorCount; i++){
+    Serial.print(sensorValues[i]);
+    Serial.print('\t');
+  }
+
+//  Serial.print(position);
+
+// if the black line is spotted.
+if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && sensorValues[6] > threshold && sensorValues[7] > threshold && gripperClosed == 0){
+  halt();
+  //close gripper
+  //gripperClose
+  closeGripper();
+  gripperClosed = 1;
+  turnLeft(7, 7);
+  delay(1000);
+  moveForward(30,30);
+  delay(500);
+
+} else if( sensorValues[3] > threshold && sensorValues[4] > threshold ){ 
+      moveForward(20, 20);
+  }
+  else if(sensorValues[1] > threshold || sensorValues[2] > threshold){ // line is on the right
+      turnRight(1, 1);
+  } else if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && sensorValues[6] > threshold && sensorValues[7] > threshold && gripperClosed == 1){
+    halt();
+    openGripper();
+    goBackward(40,40);
+  }
+  else if(sensorValues[5] > threshold || sensorValues[6] > threshold){ // line is on the left
+      turnLeft(1, 1);
+  } else if(sensorValues[0] < threshold && sensorValues[1] < threshold && sensorValues[2] < threshold && sensorValues[3] < threshold && sensorValues[4] < threshold && sensorValues[5] < threshold && gripperClosed == 1){
+    
     lookForward();
     lookLeft();
 
-      if(distanceLeft > 20) {
+
+      if(distanceLeft > 24) {
         moveForward(7,7);
-        turnLeft(7,7);
+        turnLeft(16,16);
         delay(1000);
-        moveForward(30,30);
+        goForward();
         delay(500);
       } else if (distanceForward > 7) {
-        moveForward(40, 40);
+        moveForward(10, 10);
       } else {
         moveForward(3,3);
-        turnRight(7,7);
+        turnRight(25,25);
+        delay(50);
       }
 
 //Serial.print("Counter 1: ");
@@ -234,6 +241,7 @@ void loop() {
 //        goBackward(5, 5);
 //        halt();
 //  }
+}
 }
 //}
 
@@ -340,10 +348,11 @@ void turnRight(int pulse1, int pulse2){
     setPulse1 = counter1 - pulse1;
     setPulse2 = counter2 - pulse2;
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){ // L && R
+      movingForward = false;
       analogWrite(a1, 0);
       analogWrite(a2, 200);
       analogWrite(b1, 0); //right motors
-      analogWrite(b2, 230);
+      analogWrite(b2, 215);
       strip.fill(amber);
       strip.show(); 
       delay(250);
@@ -357,13 +366,13 @@ void turnLeft(int pulse1, int pulse2){
     setPulse1 = counter1 - pulse1;
     setPulse2 = counter2 - pulse2;
     if (setPulse1 <= pulse1 && setPulse2 <= pulse2){
+      movingForward = false;
       analogWrite(a1, 0); //left
       analogWrite(a2, 0); //left
       analogWrite(b1, 215); //right
       analogWrite(b2, 0); //right
       strip.fill(amber);
       strip.show();
-
     }
     else{
       stopped();
@@ -415,6 +424,7 @@ void closeGripper(){
     strip.fill(red);
     strip.show(); 
   }
+
 
 ////=====[Distance Checking]=====////
 
