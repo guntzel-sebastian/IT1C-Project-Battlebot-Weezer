@@ -1,3 +1,5 @@
+
+
 /****************************
 *          [ io ]           *
 ****************************/
@@ -83,6 +85,7 @@ volatile byte state = LOW;
 int setPulse1 = 0;
 int setPulse2 = 0;
 volatile int previousCount = 0;
+int pulseCounter = 0;
 
 ////=====[Gripper]=====////
 
@@ -106,7 +109,7 @@ boolean forward = false;
 
 ////=====[Line Sensor]====/////
 
-int threshold = 900;
+int threshold = 750;
 
 ////=====[Bluetooth]=====////
 
@@ -138,18 +141,18 @@ void setup() {
  //print the calibration minimum values measured when emitters were on
   Serial.begin(9600);
   for(uint8_t i = 0; i < SensorCount; i++){
-    Serial.print(qtr.calibrationOn.minimum[i]);
-    Serial.print(' ');
+//    Serial.print(qtr.calibrationOn.minimum[i]);
+//    Serial.print(' ');
   }
   Serial.println();
 
   //print the calibration maximum values measured when emitters were on
   for(uint8_t i = 0; i < SensorCount; i++){
-    Serial.print(qtr.calibrationOn.maximum[i]);
-    Serial.print(' ');
+//    Serial.print(qtr.calibrationOn.maximum[i]);
+//    Serial.print(' ');
   }
-  Serial.println();
-  Serial.println();
+//  Serial.println();
+//  Serial.println();
 
   //interrupts
   pinMode(interruptPin1, INPUT_PULLUP);
@@ -194,7 +197,7 @@ void setup() {
 
       if (i % 80 == 0)
       {
-        moveForward(2, 2);
+        moveForward(2, 2, 1);
       }
       else
       {
@@ -217,45 +220,42 @@ void loop() {
   
   //The the data most on the right is the left sensor, and vice versa
   for (uint8_t i = 0; i < SensorCount; i++){
-    Serial.print(sensorValues[i]);
-    Serial.print('\t');
+//    Serial.print(sensorValues[i]);
+//    Serial.print('\t');
   }
 //  Serial.print(position);
   
-//  if( sensorValues[3] > threshold && sensorValues[4] > threshold ){ 
-//      moveForward(20, 20);
-//  }
-//  else if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 0){
-//  halt();
-//  //close gripper
-//  //gripperClose
-//  closeGripper();
-//  gripperClosed = 1;
-//  turnLeft(7, 7);
-//  delay(850);
-//  moveForward(30,30);
-//  delay(500);
-//  }
-//  else if( sensorValues[2] > threshold || sensorValues[3] > threshold ){ 
-//      moveForward(20, 20);
-//  }
-//  else if(sensorValues[0] > threshold && sensorValues[1] > threshold){ // line is on the right
-//      turnRight(1, 1);
-//  } 
-////  else if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 1){
-////    halt();
-////    openGripper();
-////    moveBackward(40,40);
-////  }
-//  else if(sensorValues[4] > threshold && sensorValues[5] > threshold){ // line is on the left
-//      turnLeft(1, 1);
-//  } 
-//  else if(sensorValues[0] < threshold && sensorValues[1] < threshold && sensorValues[2] < threshold && sensorValues[3] < threshold && sensorValues[4] < threshold && sensorValues[5] < threshold && gripperClosed == 1){
+  if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 0){
+  halt();
+  //close gripper
+  //gripperClose
+  closeGripper();
+  gripperClosed = 1;
+  turnLeft(15, 15);
+  halt();
+  moveForward(30,30);
+  delay(500);
+  }
+  else if( sensorValues[2] > threshold || sensorValues[3] > threshold ){ 
+      moveForward(20, 20);
+  }
+  else if(sensorValues[0] > threshold && sensorValues[1] > threshold){ // line is on the right
+      turnRight(1, 1);
+  } 
+  else if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 1){
+    halt();
+    openGripper();
+    moveBackward(40,40);
+  }
+  else if(sensorValues[4] > threshold && sensorValues[5] > threshold){ // line is on the left
+      turnLeft(1, 1);
+  } 
+  else if(sensorValues[0] < threshold && sensorValues[1] < threshold && sensorValues[2] < threshold && sensorValues[3] < threshold && sensorValues[4] < threshold && sensorValues[5] < threshold){
     lookForward();
     lookLeft();
     if(distanceLeft > 24) {
       moveForward(15,15);
-      //turnLeft(5,5);
+      turnLeft(5,5);
       delay(1000);
       goForward();
       delay(500);
@@ -269,21 +269,18 @@ void loop() {
       delay(50);
     }
 
-//    if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 1){
-//      halt();
-//      //close gripper
-//      //gripperClose
-//      openGripper();
-//      gripperClosed = 0;
-//      moveBackward(5, 5);
-//      halt();
-//    }
-//  Serial.print("Counter 1: ");
-//  Serial.println(counter1);
-//  Serial.print("Counter 2: ");  
-//  Serial.println(counter2);
+    if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 1){
+      halt();
+      //close gripper
+      //gripperClose
+      openGripper();
+      gripperClosed = 0;
+      moveBackward(5, 5);
+      halt();
+    }
   }
 
+}
 
 /****************************
 *****************************
@@ -301,15 +298,16 @@ uint32_t green = strip.Color(0, 255, 0);
 ////=====[Interrupts]=====////
 
 void counterLeft(){
-  noInterrupts();
+//  noInterrupts();
   counter1++;
-  interrupts();
+//  interrupts();
 }
 
 void counterRight(){
-  noInterrupts();
+//  noInterrupts();
   counter2++;
-  interrupts();
+//  interrupts();
+
 }
 
 /***********************************
@@ -394,9 +392,11 @@ void moveForward(int pulse1,int pulse2){
     analogWrite(b2, 0);
     strip.fill(white);
     strip.show();
-    Serial.println();  
+    Serial.println(counter1);  
+    break;
   }
 //  else{
+      break; 
     halt();
 //    turningLeft = false;
 //    forward = false;
@@ -413,9 +413,12 @@ void turnLeft(int pulse1, int pulse2){
     analogWrite(b2, 0); //right
     strip.fill(amber);
     strip.show();
+
   }
 //  else{
+      break; 
     halt();
+
 //    forward = true;
 //  }
 }
@@ -431,9 +434,12 @@ void turnLeft(int pulse1, int pulse2){
       strip.fill(amber);
       strip.show(); 
       delay(250);
+
     }
 //    else{
+      break; 
       halt();
+
 //    }
   }
 
@@ -446,26 +452,33 @@ void turnLeft(int pulse1, int pulse2){
       analogWrite(b1, 0); //right motors
       analogWrite(b2, 215);
       strip.fill(white);
-      strip.show(); 
+      strip.show();
+
     }
 //    else{
+      break; 
       halt();
+
 //    }
   }
 
-void moveBackRight(int pulse1, int pulse2){
+void moveBackRight(int pulse1, int pulse2, int pulseCount){
   setPulse1 = counter1 + pulse1;
   setPulse2 = counter2 + pulse2;
-  while (setPulse1 >= counter1 && setPulse2 >= counter2){ // L && R
+  pulseCounter = 0;
+  while (setPulse1 >= counter1 && setPulse2 >= counter2 && pulseCounter < ){ // L && R
     analogWrite(a1, 170);
     analogWrite(a2, 0);
     analogWrite(b1, 0); //right motors
     analogWrite(b2, 255);
     strip.fill(white);
     strip.show(); 
+
   }
 //  else{
+      break; 
     halt();
+
 //  }
 }
 
