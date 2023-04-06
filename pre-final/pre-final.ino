@@ -230,13 +230,13 @@ void loop() {
   //gripperClose
   closeGripper();
   gripperClosed = 1;
-  turnLeft(15, 15);
+  moveForward(10,10);
+  turnLeft(22, 22);
   halt();
   moveForward(30,30);
-  delay(500);
   }
   else if( sensorValues[2] > threshold || sensorValues[3] > threshold ){ 
-      moveForward(20, 20);
+      moveForward(25, 25);
   }
   else if(sensorValues[0] > threshold && sensorValues[1] > threshold){ // line is on the right
       turnRight(1, 1);
@@ -254,18 +254,15 @@ void loop() {
     lookLeft();
     if(distanceLeft > 24) {
       moveForward(15,15);
-      turnLeft(5,5);
-      delay(1000);
-      goForward();
-      delay(500);
+      turnLeft(22,22);
+      moveForward(20, 20);
     } 
-    else if (distanceForward > 7) {
+    else if (distanceForward > 10) {
       moveForward(10, 10);
     } 
     else {
-      moveForward(3,3);
-      turnRight(25,25);
-      delay(50);
+      turnRight(15,15);
+      moveBackward(5,5);
     }
 
     if(sensorValues[0] > threshold && sensorValues[1] > threshold && sensorValues[2] > threshold && sensorValues[3] > threshold && sensorValues[4] > threshold && sensorValues[5] > threshold && gripperClosed == 1){
@@ -387,7 +384,7 @@ void moveForward(int pulse1,int pulse2){
   while (setPulse1 >= counter1 && setPulse2 >= counter2){
     analogWrite(a1, 0); //left motors, lower speed to drive straight
     analogWrite(a2, 200);
-    analogWrite(b1, 215); //right motors
+    analogWrite(b1, 217); //right motors
     analogWrite(b2, 0);
     strip.fill(white);
     strip.show();
@@ -402,7 +399,7 @@ void turnLeft(int pulse1, int pulse2){
   while (setPulse1 >= counter1 && setPulse2 >= counter2){
     analogWrite(a1, 200); //left
     analogWrite(a2, 0); //left b
-    analogWrite(b1, 215); //right b
+    analogWrite(b1, 217); //right b
     analogWrite(b2, 0); //right
     strip.fill(amber);
     strip.show();
@@ -418,7 +415,7 @@ void turnLeft(int pulse1, int pulse2){
       analogWrite(a1, 0);
       analogWrite(a2, 200);
       analogWrite(b1, 0); //right motors
-      analogWrite(b2, 230);
+      analogWrite(b2, 217);
       strip.fill(amber);
       strip.show(); 
       Serial.println();
@@ -433,7 +430,7 @@ void turnLeft(int pulse1, int pulse2){
       analogWrite(a1, 200); //lower speed to drive straight
       analogWrite(a2, 0);
       analogWrite(b1, 0); //right motors
-      analogWrite(b2, 215);
+      analogWrite(b2, 217);
       strip.fill(white);
       strip.show(); 
       Serial.println();
